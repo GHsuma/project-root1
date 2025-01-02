@@ -1,69 +1,68 @@
 pipeline {
     agent any
-
     environment {
-        // Define environment variables
-        ANSIBLE_INVENTORY = 'ansible/inventory/production'
-        ANSIBLE_PLAYBOOK = 'ansible/playbooks/configure.yml'
-        ANSIBLE_USER = 'ansible-user'  // Specify your Ansible user
-        ANSIBLE_PRIVATE_KEY = credentials('ansible-private-key')  // Use Jenkins credentials plugin
+        GITHUB_SSH_KEY = credentials('github-ssh-key')  // This is the Jenkins credential ID for your SSH private key
         REGISTRY_URL = 'us-south.icr.io/project-root'
         CLUSTER_NAME = 'my-cluster'
-        APP_NAME = 'my-app'
     }
-
     stages {
-        // Checkout code from GitHub
         stage('Checkout') {
             steps {
-                git 'https://github.com/GHsuma/project-root1.git'
-            }
-        }
-
-        // Run Ansible Playbook for Configuration Management
-        stage('Run Ansible Playbook') {
-            steps {
                 script {
-                    // Running Ansible playbook to configure the server
+                    // Set SSH key permissions and use it for GitHub authentication
                     sh '''
-                    ansible-playbook -i $ANSIBLE_INVENTORY $ANSIBLE_PLAYBOOK --user $ANSIBLE_USER --private-key $ANSIBLE_PRIVATE_KEY
+                    mkdir -p ~/.ssh
+                    echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
+                    chmod 600 ~/.ssh/id_rsa
+                    ssh-keyscan github.com >> ~/.ssh/known_hosts
+                    git clone git@github.com:GHsuma/project-root1.git
                     '''
                 }
             }
         }
-
-        // Build Docker image and push to registry
-        stage('Build and Push Docker Image') {
+        stage('Run Ansible Playbook for Configuration') {
             steps {
                 script {
-                    // Build Docker image
-                    sh 'docker build -t $REGISTRY_URL/$APP_NAME .'
-                    // Push Docker image to IBM Cloud Container Registry
-                    sh 'docker push $REGISTRY_URL/$APP_NAME'
+                    // Running the Ansible playbook for configuration
+                    sh '''
+                    ansible-playbook -i ansible/inventory/development ansible/playbooks/configure.yml --user ansible-user --private-key ~/.ssh/id_rsa
+                    '''
                 }
             }
         }
-
-        // Deploy the application to Kubernetes
+        stage('Deploy Configuration to Production') {
+            steps {
+                script {
+                    // Running the Ansible playbook for production deployment
+                    sh '''
+                    ansible-playbook -i ansible/inventory/production ansible/playbooks/deploy.yml --user ansible-user --private-key ~/.ssh/id_rsa
+                    '''
+                }
+            }
+        }
+        stage('Push Docker Image to IBM Cloud Container Registry') {
+            steps {
+                script {
+                    sh 'docker build -t $REGISTRY_URL/my-app .'
+                    sh 'docker push $REGISTRY_URL/my-app'
+                }
+            }
+        }
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Configure kubectl for IBM Cloud
                     sh '''
-                    ibmcloud login --apikey <API_KEY> -r <REGION> -g <RESOURCE_GROUP>
-                    ibmcloud ks cluster config --cluster $CLUSTER_NAME
+                    ibmcloud login --apikey <API_KEY> -r <REGION> -g <RESOURCE_GROUP> ibmcloud ks cluster config --cluster $CLUSTER_NAME
                     kubectl apply -f k8s/deployment.yaml
                     '''
                 }
             }
         }
     }
-
     post {
         success {
             echo 'Pipeline executed successfully.'
         }
-
         failure {
             echo 'Pipeline failed. Please check the logs.'
         }
