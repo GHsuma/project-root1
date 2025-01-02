@@ -1,65 +1,73 @@
 pipeline {
     agent any
     environment {
-        GITHUB_SSH_KEY = credentials('github-ssh-key')  // This is the Jenkins credential ID for your SSH private key
-        REGISTRY_URL = 'us-south.icr.io/project-root'
-        CLUSTER_NAME = 'my-cluster'
+        // GitHub Repository details
+        GIT_REPO = 'git@github.com:GHsuma/project-root1.git'  // Replace with your actual GitHub repository SSH URL
+        SSH_CREDENTIALS_ID = 'github-ssh-key'  // Replace with the ID of your SSH key in Jenkins credentials store
+        ANSIBLE_INVENTORY = 'ansible/inventory/development'  // Update according to your inventory file
+        ANSIBLE_PLAYBOOK = 'ansible/playbooks/configure.yml'  // Update according to your playbook
+        ANSIBLE_USER = 'ansible-user'  // Update according to your Ansible user
+        ANSIBLE_PRIVATE_KEY = credentials('ansible-private-key')  // If using private key, update accordingly
+        REGISTRY_URL = 'us-south.icr.io/project-root'  // Update with your registry URL
+        CLUSTER_NAME = 'my-cluster'  // Update with your Kubernetes cluster name
     }
+
     stages {
+        // Checkout Git repository
         stage('Checkout') {
             steps {
                 script {
-                    // Set SSH key permissions and use it for GitHub authentication
-                    sh '''
-                    mkdir -p ~/.ssh
-                    echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
-                    chmod 600 ~/.ssh/id_rsa
-                    ssh-keyscan github.com >> ~/.ssh/known_hosts
-                    git clone git@github.com:GHsuma/project-root1.git
-                    '''
+                    // Using SSH credentials for Git checkout
+                    git credentialsId: SSH_CREDENTIALS_ID, url: GIT_REPO
                 }
             }
         }
+
+        // Run Ansible playbook for configuration
         stage('Run Ansible Playbook for Configuration') {
             steps {
                 script {
-                    // Running the Ansible playbook for configuration
                     sh '''
-                    ansible-playbook -i ansible/inventory/development ansible/playbooks/configure.yml --user ansible-user --private-key ~/.ssh/id_rsa
+                    ansible-playbook -i $ANSIBLE_INVENTORY $ANSIBLE_PLAYBOOK --user $ANSIBLE_USER --private-key $ANSIBLE_PRIVATE_KEY
                     '''
                 }
             }
         }
-        stage('Deploy Configuration to Production') {
-            steps {
-                script {
-                    // Running the Ansible playbook for production deployment
-                    sh '''
-                    ansible-playbook -i ansible/inventory/production ansible/playbooks/deploy.yml --user ansible-user --private-key ~/.ssh/id_rsa
-                    '''
-                }
-            }
-        }
-        stage('Push Docker Image to IBM Cloud Container Registry') {
+
+        // Build Docker image
+        stage('Build Docker Image') {
             steps {
                 script {
                     sh 'docker build -t $REGISTRY_URL/my-app .'
+                }
+            }
+        }
+
+        // Push Docker image to IBM Cloud Container Registry
+        stage('Push Docker Image to IBM Cloud') {
+            steps {
+                script {
                     sh 'docker push $REGISTRY_URL/my-app'
                 }
             }
         }
+
+        // Deploy to Kubernetes
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     sh '''
-                    ibmcloud login --apikey <API_KEY> -r <REGION> -g <RESOURCE_GROUP> ibmcloud ks cluster config --cluster $CLUSTER_NAME
+                    ibmcloud login --apikey <API_KEY> -r <REGION> -g <RESOURCE_GROUP> 
+                    ibmcloud ks cluster config --cluster $CLUSTER_NAME
                     kubectl apply -f k8s/deployment.yaml
                     '''
                 }
             }
         }
     }
+
     post {
+        // Handle success or failure
         success {
             echo 'Pipeline executed successfully.'
         }
