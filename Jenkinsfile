@@ -6,8 +6,6 @@ pipeline {
         SSH_CREDENTIALS_ID = 'github-ssh-key'  // Replace with the ID of your SSH key in Jenkins credentials store
         ANSIBLE_INVENTORY = 'ansible/inventory/development'  // Update according to your inventory file
         ANSIBLE_PLAYBOOK = 'ansible/playbooks/configure.yml'  // Update according to your playbook
-        ANSIBLE_USER = 'ansible-user'  // Update according to your Ansible user
-        ANSIBLE_PRIVATE_KEY = credentials('ansible-private-key')  // If using private key, update accordingly
         REGISTRY_URL = 'us-south.icr.io/project-root'  // Update with your registry URL
         CLUSTER_NAME = 'my-cluster'  // Update with your Kubernetes cluster name
     }
@@ -27,8 +25,9 @@ pipeline {
         stage('Run Ansible Playbook for Configuration') {
             steps {
                 script {
+                    // Running Ansible without private key
                     sh '''
-                    ansible-playbook -i $ANSIBLE_INVENTORY $ANSIBLE_PLAYBOOK --user $ANSIBLE_USER --private-key $ANSIBLE_PRIVATE_KEY
+                    ansible-playbook -i $ANSIBLE_INVENTORY $ANSIBLE_PLAYBOOK
                     '''
                 }
             }
