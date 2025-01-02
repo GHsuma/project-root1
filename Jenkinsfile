@@ -3,10 +3,11 @@ pipeline {
     environment {
         // GitHub Repository details
         GIT_REPO = 'git@github.com:GHsuma/project-root1.git'  // Replace with your actual GitHub repository SSH URL
-        SSH_CREDENTIALS_ID = 'ansible-private-key'  // Replace with the ID of your SSH private key in Jenkins credentials store
+        SSH_CREDENTIALS_ID = 'github-ssh-key'  // Replace with the ID of your SSH key in Jenkins credentials store
         ANSIBLE_INVENTORY = 'ansible/inventory/development'  // Update according to your inventory file
         ANSIBLE_PLAYBOOK = 'ansible/playbooks/configure.yml'  // Update according to your playbook
         ANSIBLE_USER = 'ansible-user'  // Update according to your Ansible user
+        ANSIBLE_PRIVATE_KEY = credentials('ansible-private-key')  // This will load the private key from Jenkins credentials
         REGISTRY_URL = 'us-south.icr.io/project-root'  // Update with your registry URL
         CLUSTER_NAME = 'my-cluster'  // Update with your Kubernetes cluster name
     }
@@ -16,7 +17,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    // Checkout the Git repository using SSH credentials stored in Jenkins
+                    // Using SSH credentials for Git checkout
                     git credentialsId: SSH_CREDENTIALS_ID, url: GIT_REPO
                 }
             }
