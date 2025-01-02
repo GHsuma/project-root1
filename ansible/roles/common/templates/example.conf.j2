@@ -1,0 +1,20 @@
+# example.conf.j2 - Web Server Configuration
+
+server {
+    listen {{ server_port }};
+    server_name {{ server_name }};
+    
+    location / {
+        root {{ app_root }};
+        index index.html index.htm;
+    }
+
+    access_log /var/log/nginx/{{ app_name }}_access.log;
+    error_log /var/log/nginx/{{ app_name }}_error.log;
+
+    # If you need to proxy requests to an app or backend service
+    proxy_pass http://{{ app_backend }};
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}

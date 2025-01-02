@@ -1,0 +1,29 @@
+- name: Configure the application server
+  hosts: web_servers
+  vars:
+    app_name: "my-app"
+    app_version: "1.0"
+    server_port: 80
+    server_name: "my-app.com"
+    app_root: "/var/www/my-app"
+    app_backend: "127.0.0.1:5000"
+
+  tasks:
+    - name: Create the application configuration file from template
+      template:
+        src: roles/common/templates/example.conf.j2
+        dest: /etc/nginx/sites-available/{{ app_name }}.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable the site configuration (link to sites-enabled)
+      file:
+        src: /etc/nginx/sites-available/{{ app_name }}.conf
+        dest: /etc/nginx/sites-enabled/{{ app_name }}.conf
+        state: link
+
+    - name: Reload Nginx to apply changes
+      service:
+        name: nginx
+        state: reloaded

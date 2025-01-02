@@ -1,0 +1,28 @@
+- name: Deploy Web Server Configuration
+  hosts: web_servers
+  vars:
+    app_name: "my-app"
+    server_port: 80
+    server_name: "my-app.com"
+    app_root: "/var/www/my-app"
+    app_backend: "127.0.0.1:5000"
+
+  tasks:
+    - name: Deploy web server configuration using template
+      template:
+        src: roles/webserver/templates/webserver.conf.j2
+        dest: /etc/nginx/sites-available/{{ app_name }}.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable the site (create symlink to sites-enabled)
+      file:
+        src: /etc/nginx/sites-available/{{ app_name }}.conf
+        dest: /etc/nginx/sites-enabled/{{ app_name }}.conf
+        state: link
+
+    - name: Reload Nginx to apply changes
+      service:
+        name: nginx
+        state: reloaded
